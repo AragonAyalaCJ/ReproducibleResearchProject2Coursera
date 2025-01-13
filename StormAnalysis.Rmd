@@ -1,0 +1,154 @@
+---
+title: "Storm Analysis Coursera Project 2 for Reproducible Research"
+author: "AragonAyalaCJ"
+date: "2025-01-13"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Analysis of Severe Weather Events Impact on Public Health and Economy in the United States
+
+This project look at the NOAA Storm Database (1950 - 2011) to identify the types of severe weather events that are most harmful to population health and have the greatest economic consequences.  The analysis includes data processing steps, results with visualizations, and a discussion of the findings.
+
+## Data Processing
+
+First, load packages.
+
+```{r}
+library(tidyverse)
+```
+
+Download file
+
+```{r}
+
+url_data <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+
+data_path <- file.path("data","StormData.csv.bz2")
+
+if (!dir.exists("data")) {
+     dir.create("data")   
+} 
+
+download.file(url_data, data_path)
+```
+
+Import data to R
+
+```{r}
+# Readr package automatically unzip bz2
+
+raw_data <- read_csv(data_path)
+
+```
+
+Transform and clean data
+
+```{r}
+# Convert date columns
+
+data <- raw_data |> 
+        mutate(BGN_DATE = strptime(BGN_DATE, format = "%m/%d/%Y %H:%M:%S")) 
+        
+# Filter relevant columns
+data <- data |> 
+  select(EVTYPE, FATALITIES, INJURIES, PROPDMG, PROPDMGEXP, CROPDMG, CROPDMGEXP)
+
+# Handle missing values
+data <- na.omit(data)
+
+# Creating a function to convert exponent symbols to numeric values
+
+convert_exponent <- function(exp) {
+  if (sum(exp %in% c("K", "k"))) {
+    return(1e3)
+  } else if (sum(exp %in% c("M", "m"))) {
+    return(1e6)
+  } else if (sum(exp %in% c("B", "b"))) {
+    return(1e9)
+  } else if (sum(exp %in% c("H", "h"))) {
+    return(1e2)
+  } else if (sum(exp %in% c("", "+", "-", "?", "0"))) {
+    return(1)
+  } else {
+    return(as.numeric(exp))
+  }
+}
+
+# Create relevant variables
+
+data <- data |> 
+        mutate(numPROPDMGEXP = convert_exponent(PROPDMGEXP),
+               numCROPDMGEXP = convert_exponent(CROPDMGEXP),
+               totalPROPDMGE = numPROPDMGEXP * PROPDMG,
+               totalCROPDMGE = numCROPDMGEXP * CROPDMG,
+               totalEconomicDmg = totalPROPDMGE + totalCROPDMGE)
+
+
+
+```
+
+## Results 
+
+Most Harmful Events to Population Health (Fatalities)
+
+```{r}
+# Aggregate data by event type
+health_impact <- data  |> 
+  group_by(EVTYPE)  |> 
+  summarize(Total_Fatalities = sum(FATALITIES), Total_Injuries = sum(INJURIES))  |> 
+  arrange(desc(Total_Fatalities))
+
+# Plot the results
+ggplot(health_impact[1:10, ], aes(x = reorder(EVTYPE, -Total_Fatalities), y = Total_Fatalities)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Top 10 Most Harmful Events to Population Health (Fatalities)",
+       x = "Event Type", y = "Total Fatalities") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+Most Harmful Events to Population Health (Injuries)
+
+```{r}
+# Plot the results
+
+health_impact <- data  |> 
+  group_by(EVTYPE)  |> 
+  summarize(Total_Fatalities = sum(FATALITIES), Total_Injuries = sum(INJURIES))  |> 
+  arrange(desc(Total_Injuries))
+
+ggplot(health_impact[1:10, ], aes(x = reorder(EVTYPE, -Total_Injuries), y = Total_Injuries)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Top 10 Most Harmful Events to Population Health (Injuries)",
+       x = "Event Type", y = "Total Injuries") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+Events with Greatest Economic Consequences
+
+```{r}
+
+economic_impact <- data %>%
+  group_by(EVTYPE) %>%
+  summarize(Total_Economic_Damage = sum(totalEconomicDmg)) %>%
+  arrange(desc(Total_Economic_Damage))
+
+# Plot the results
+ggplot(economic_impact[1:10, ], aes(x = reorder(EVTYPE, -Total_Economic_Damage), y = Total_Economic_Damage)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Top 10 Events with Greatest Economic Consequences",
+       x = "Event Type", y = "Total Economic Damage (in dollars)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+# Conclusions
+
+As we see, Tornado is the most harmful weather event. It is important that authorities help to solve this situation.
+
+
+
